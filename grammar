@@ -1,0 +1,80 @@
+ORIGINAL GRAMMAR
+
+
+PROGRAM -> STMTS.
+STMTS -> STMT | STMT break STMTS.
+STMT -> skip | identifier assign EXPR | if ( LEXPR ) then ( STMTS ) else ( STMTS ) | while ( LEXPR ) do ( STMTS ).
+EXPR -> TERM EXPRS | TERM.
+EXPRS -> ADDOP TERM EXPRS | ADDOP TERM.
+TERM -> FACTOR TERMS | FACTOR.
+TERMS -> multiply FACTOR TERMS | multiply FACTOR.
+FACTOR -> integer | identifier | ( EXPR ).
+LEXPR -> LTERM LEXPRS | LTERM.
+LEXPRS -> and LTERM LEXPRS | and LTERM.
+LTERM -> not LFACTOR | LFACTOR.
+LFACTOR -> true | false | EXPR RELOP EXPR.
+RELOP -> lessthan | equal.
+ADDOP -> plus | minus.
+
+
+
+NEW LL(1) GRAMMAR
+
+
+PROGRAM → STMTS
+STMTS →	STMT FSTMT
+FSTMT →	break STMTS
+STMT → skip
+	| identifier assign EXPR
+	| if ( LEXPR ) then ( STMTS ) else ( STMTS )
+	| while ( LEXPR ) do ( STMTS )
+EXPR → TERM FTERM
+FTERM →	EXPRS 
+	| epsilon
+EXPRS →	ADDOP FADDOP
+FADDOP → TERM FTERM1
+FTERM1 → EXPRS 
+	| epsilon
+TERM → FACTOR FFACTOR
+FFACTOR → TERMS 
+	| epsilon
+TERMS →	multiply Fmultiply
+Fmultiply →	FACTOR FFACTOR1
+FFACTOR1 → TERMS
+	| epsilon
+FACTOR → integer
+	| identifier
+	| ( EXPR )
+LEXPR →	LTERM FLTERM
+FLTERM → LEXPRS
+	| epsilon
+LEXPRS → and Fand
+Fand → LTERM FLTERM1
+FLTERM1 → LEXPRS
+	| epsilon
+LTERM →	 not LFACTOR
+	| LFACTOR
+LFACTOR →	 true
+	| false
+	| EXPR RELOP EXPR .
+RELOP →	 lessthan
+	| equal
+ADDOP →	 plus
+	| minus
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
