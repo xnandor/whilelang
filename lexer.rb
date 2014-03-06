@@ -4,8 +4,16 @@ class Lexer
   @variables = {}
   @tokens = []
   @point = 0
+  @original
   
   def initialize(filename)
+    if (filename == nil)
+      puts " "
+      puts "USAGE ERROR: PLEASE GIVE FILE AS ARGUMENT:"
+      puts "\t lexter.rb <WHILE FILE>"
+      puts " "
+      abort()
+    end
     @variables = {}
     @tokens = []
     @point = 0
@@ -15,19 +23,53 @@ class Lexer
 
   def parse(file)
     text = file.read
+    @original = String.new(text) # used later in parser feedback
     #remove comments
     while (text =~ /\/\/.*$/)
       text.slice!(/\/\/.*$/)
     end
-    #tokenize
-    regtokens = /[a-zA-Z][\w\d]*|:=|\+|\-|\*|\(|\)|<=|=|\d+|\/|;|true|false|and|not|skip|if|then|else|while|do/
-    @tokens = text.scan(regtokens)
-    @tokens.insert(-1,"EOF")
+    #token rules
+    regtokens = /[a-zA-Z][\w\d]*|:=|\+|\-|\*|\(|\)|<=|=|\d+|;|true|false|and|not|skip|if|then|else|while|do/
+    #find invalid tokens
+    invalid = String.new(text)
+    while (invalid =~ regtokens)
+      invalid.slice!(regtokens)
+    end
+    while (invalid =~ /\s+/)
+      invalid.slice!(/\s+/)
+    end
+    #throw error if invalid symbols
+    if (invalid != '')
+      puts " "
+      puts "TOKEN ERROR: There was one or more invalid symbols:  "
+      puts "\t" << invalid
+      puts " "
+      abort()
+    end
+    #extract valid tokens
+    @tokens = []
+    lines = @original.split(/^/)
+    linenum = 0
+    charnum = 1
+    puts "________TOKEN__________LINE_NUMBER___CHARACTER_NUMBER____"
+    text.scan(regtokens){
+      |token|
+      while (lines[linenum].index(token) == nil)
+        linenum = linenum + 1
+      end
+      charnum = lines[linenum].index(token)
+      sliced = lines[linenum].slice!(token)
+      lines[linenum] = lines[linenum].prepend(" "*sliced.length)
+      l = linenum+1
+      c = charnum
+      puts "\t #{token}\t\t\t(#{l},#{charnum})"
+      @tokens.push([token, l, c]);
+    }
+    @tokens.insert(-1,["EOF",0,0])
   end
 
-  def print_tokens()
-    print @tokens
-    print "\n"
+  def get_code_lines()
+    return @original.split(/^/)
   end
 
   def get_token()
@@ -49,12 +91,12 @@ end
 class Parser
   @lexer
   @cs #Current Symbol
+  @cl #Current Line
+  @cc #Current Character
   @symbols
 
   def initialize(lexer)
     @lexer = lexer
-    puts "PARSER INITIALIZING"
-    puts ''
     get_symbol()
     program
     programend
@@ -62,9 +104,9 @@ class Parser
 
   def get_symbol()
     token = @lexer.get_token
-    print 'current symbol: '
-    print token
-    case token
+    @cl = token[1]
+    @cc = token[2]
+    case token[0]
     when /^EOF$/
       @cs = "EOF"
     when /^\+$/
@@ -116,8 +158,6 @@ class Parser
     else
 
     end
-    print "  \t current symbol: "
-    puts @cs
   end
 
   def accept?(symbol)
@@ -130,54 +170,55 @@ class Parser
 
   def match(symbol)
     if (symbol == "EOF")
-      puts "Parsed Successfully"
+      puts ''
+      puts "      __..--~~==##` NO ERRORS '##==~~--..__"
+      puts ''
       abort()
     end
-    print 'MATCHED   '
-    puts symbol
-    puts ''
     if (accept? symbol)
       return true
     end
-    error("Error: unexpected symbol: #{@cs}")
+    error()
     return false
   end
 
-  def error(message)
-    puts message
+  def error()
+    puts " "
+    puts "PARSE ERROR: UNEXPECTED SYMBOL AT LOCATION: l.#{@cl} c.#{@cc}"
+    line = @lexer.get_code_lines[@cl-1]
+    puts "\t" << line
+    arrow = "\t" << " "*@cc << "^"
+    puts  arrow
+    puts " "
     abort()
   end
 
   def program()
-    print 'PROGRAM - '
     if (@cs == 'identifier' or @cs == 'while' or @cs == 'if' or @cs == 'skip')
       stmts
     else
-      error("Expected: an identifier or while or if or skip")
+      error()
     end
   end
 
   def programend()
-    print 'PROGRAMEND - '
     if (@cs == 'EOF')
       match("EOF")
     else
-      error("Parse Error: Tokens still remain")
+      error()
     end
   end
 
   def stmts()
-    print 'STMTS - '
     if (@cs == 'identifier' or @cs == 'while' or @cs == 'if' or @cs == 'skip')
       stmt
       fstmt
     else
-      error("Expected: an identifier or while or if or skip")
+      error()
     end
   end
 
   def fstmt()
-    print 'FSTMT - '
     if (@cs == "break")
       match("break")
       stmts
@@ -189,7 +230,6 @@ class Parser
   end
 
   def stmt()
-    print 'STMT - '
     if (@cs == "identifier")
       match('identifier')
       match('assign')
@@ -219,22 +259,20 @@ class Parser
     elsif (@cs == 'skip')
       match('skip')
     else
-      error('expected and identifier, while, if or skip')
+      error()
     end
   end
 
   def expr()
-    print 'EXPR - '
     if (@cs == 'leftparen' or @cs == 'identifier' or @cs == 'integer')
       term
       fterm
     else
-      error('Expected and expression')
+      error()
     end
   end
 
   def fterm()
-    print 'FTERM - '
     if (@cs == 'minus' or @cs == 'plus')
       exprs
     elsif (@cs == 'equal' or @cs == 'lteq' or @cs == 'and' or @cs == 'rightparen' or @cs == 'break')
@@ -245,27 +283,24 @@ class Parser
   end
 
   def exprs()
-    print 'EXPRS - '
     if (@cs == 'minus' or @cs == 'plus')
       addop
       faddop
     else
-      error('Expected a plus or a minus')
+      error()
     end
   end
 
   def faddop()
-    print 'FADDOP - '
     if (@cs == 'leftparen' or @cs == 'identifier' or @cs == 'integer')
       term
       fterm1
     else
-      error("Expected something")
+      error()
     end
   end
 
   def fterm1()
-    print 'FTERM1 - '
     if (@cs == 'minus' or @cs == 'plus')
       exprs
     elsif(@cs == 'equal' or @cs == 'lteq')
@@ -276,17 +311,15 @@ class Parser
   end
 
   def term()
-    print 'TERM - '
     if (@cs == 'leftparen' or @cs == 'identifier' or @cs == 'integer')
       factor
       ffactor
     else
-      error("Expected a leftparen, identifier or integer")
+      error()
     end
   end
 
   def ffactor()
-    print 'FFACTOR - '
     if (@cs == 'multiply')
       terms
     else
@@ -295,7 +328,6 @@ class Parser
   end
 
   def terms()
-    print 'TERMS - '
     if (@cs == 'multiply')
       match('multiply')
       fmultiply
@@ -305,17 +337,15 @@ class Parser
   end
 
   def fmultiply()
-    print 'FMULTIPLY - '
     if (@cs == 'leftparen' or @cs == 'identifier' or @cs == 'integer')
       factor
       ffactor1
     else
-      error('Expected something')
+      error()
     end
   end
 
   def ffactor1()
-    print 'FFACTOR1 - '
     if (@cs == 'multiply')
       terms
     else
@@ -324,7 +354,6 @@ class Parser
   end
 
   def factor()
-    print 'FACTOR - '
     if (@cs == 'leftparen')
       match('leftparen')
       expr
@@ -334,12 +363,11 @@ class Parser
     elsif (@cs == 'integer')
       match('integer')
     else
-      error('expected something')
+      error()
     end
   end
 
   def lexpr()
-    print 'LEXPR - '
     if (@cs == 'leftparen' or @cs == 'identifier' or @cs == 'integer')
       lterm
       flterm
@@ -347,12 +375,11 @@ class Parser
       lterm
       flterm
     else
-      error("Expected lexpr")
+      error()
     end
   end
 
   def flterm()
-    print 'FLTERM - '
     if (@cs == 'and')
       lexprs
     elsif (@cs == 'leftparen')
@@ -363,17 +390,15 @@ class Parser
   end
 
   def lexprs()
-    print 'LEXPRS - '
     if (@cs == 'and')
       match('and')
       fand
     else
-      error ('Expected an "and"')
+      error ()
     end
   end
 
   def fand()
-    print 'FAND - '
     if (@cs == 'leftparen' or @cs == 'identifier' or @cs == 'integer')
       lterm
       flterm1
@@ -381,12 +406,11 @@ class Parser
       lterm
       flterm1
     else
-      error('Expected a different symbol')
+      error()
     end
   end
 
   def flterm1()
-    print 'FLTERM1 - '
     if (@cs == 'and')
       lexprs
     elsif (@cs == 'rightparen')
@@ -397,7 +421,6 @@ class Parser
   end
 
   def lterm()
-    print 'LTERM - '
     if (@cs == 'false' or @cs == 'true')
       lfactor
     elsif (@cs == 'not')
@@ -406,12 +429,11 @@ class Parser
     elsif (@cs == 'leftparen' or @cs == 'identifier' or @cs == 'integer')
       lfactor
     else
-      error('Expected something for "LTERM"')
+      error()
     end
   end
 
   def lfactor()
-    print 'LFACTOR - '
     if (@cs == 'true')
       match('true')
     elsif (@cs == 'false')
@@ -421,36 +443,32 @@ class Parser
       relop
       expr
     else
-      error('expected something for LFACTOR')
+      error()
     end
   end
 
   def relop()
-    print 'RELOP - '
     if (@cs == 'equal')
       match('equal')
     elsif (@cs == 'lteq')
       match('lteq')
     else
-      error('Expected a relationship operator')
+      error()
     end
   end
 
   def addop()
-    print 'ADDOP - '
     if (@cs == 'minus')
       match('minus')
     elsif (@cs == 'plus')
       match('plus')
     else
-      error('Expected an +/- operator')
+      error()
     end
   end
 
 end
 
-
-lexer = Lexer.new("test.while")
-lexer.print_tokens
+lexer = Lexer.new(ARGV[0])
 parser = Parser.new(lexer)
 

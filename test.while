@@ -4,6 +4,7 @@ if (test=10) then (
 )
 else ( test := 1 );
 
+//beach := 4/2;
 
 //lone comment
 i := 1;
@@ -13,6 +14,12 @@ while (i <= 10) do (
 
 if (true) then (
    math86 := 10*test-(2*2)
-) else (a := 11)
+) else (a := 11);
+
+x := 5;
+x
+            :=
+                      5
+
 
 
